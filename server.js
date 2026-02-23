@@ -625,4 +625,27 @@ app.get('/api/run-seed', async (req, res) => {
   }
 })
 
+// Rota para verificar dados (acessar pelo navegador)
+app.get('/api/check-data', async (req, res) => {
+  const obras = await prisma.obra.findMany({
+    include: { etapas: true, user: true }
+  })
+  const users = await prisma.user.findMany({
+    select: { id: true, name: true, email: true, type: true }
+  })
+  
+  res.json({
+    totalObras: obras.length,
+    totalUsuarios: users.length,
+    usuarios: users,
+    obras: obras.map(o => ({
+      nome: o.name,
+      cliente: o.clientName,
+      etapasCount: o.etapas.length,
+      progresso: o.progress,
+      temEtapas: o.etapas.length > 0
+    }))
+  })
+})
+
 module.exports = app
