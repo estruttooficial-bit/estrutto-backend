@@ -4,9 +4,9 @@
   "description": "Backend para aplicação de gerenciamento de obras - Estrutto Engenharia",
   "main": "server.js",
   "scripts": {
-    "build": "prisma generate",
+    "build": "prisma generate && npm run migrate:prod",
     "dev": "node --watch server.js",
-    "start": "node server.js",
+    "start": "prisma generate && node server.js",
     "seed": "node prisma/seed.js",
     "migrate": "prisma migrate dev",
     "migrate:prod": "prisma migrate deploy",
