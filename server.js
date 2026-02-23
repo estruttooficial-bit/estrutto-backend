@@ -539,5 +539,90 @@ process.on('SIGINT', async () => {
   await prisma.$disconnect()
   process.exit(0)
 })
+// ─── ROTA TEMPORÁRIA PARA SEED ───
+// Acesse: https://estrutto-backend.onrender.com/api/run-seed?key=estrutto2026
+app.get('/api/run-seed', async (req, res) => {
+  if (req.query.key !== 'estrutto2026') {
+    return res.status(401).json({ error: 'Chave incorreta' })
+  }
+
+  try {
+    const bcrypt = require('bcryptjs')
+    
+    // Limpar dados antigos
+    await prisma.rdo.deleteMany()
+    await prisma.mensagem.deleteMany()
+    await prisma.foto.deleteMany()
+    await prisma.etapa.deleteMany()
+    await prisma.obra.deleteMany()
+    await prisma.user.deleteMany()
+    
+    console.log('🧹 Dados antigos limpos')
+
+    // Criar usuários
+    const senhaClientes = await bcrypt.hash('121314', 10)
+    const senhaLuan = await bcrypt.hash('235863', 10)
+    const senhaApoio = await bcrypt.hash('121314', 10)
+
+    const luan = await prisma.user.create({
+      data: {
+        email: 'luandeleon@estrutto.com.br',
+        password: senhaLuan,
+        name: 'Luan de Leon',
+        type: 'ENGINEER', // ← ENGENHEIRO!
+      }
+    })
+
+    const apoio = await prisma.user.create({
+      data: {
+        email: 'apoio@estrutto.com.br',
+        password: senhaApoio,
+        name: 'Apoio Administrativo',
+        type: 'ENGINEER',
+      }
+    })
+
+    const roberto = await prisma.user.create({
+      data: {
+        email: 'roberto@estrutto.com.br',
+        password: senhaClientes,
+        name: 'Roberto',
+        type: 'CLIENT',
+      }
+    })
+
+    const priscilla = await prisma.user.create({
+      data: {
+        email: 'priscilla@estrutto.com.br',
+        password: senhaClientes,
+        name: 'Priscilla Blattner',
+        type: 'CLIENT',
+      }
+    })
+
+    const marcelo = await prisma.user.create({
+      data: {
+        email: 'marcelo@estrutto.com.br',
+        password: senhaClientes,
+        name: 'Marcelo Bronzatto',
+        type: 'CLIENT',
+      }
+    })
+
+    console.log('✅ Usuários criados')
+
+    // Criar obras e etapas... (cola o resto do seu seed aqui)
+    // Ou simplifica: só crie as obras básicas primeiro para testar
+    
+    res.json({ 
+      success: true, 
+      message: 'Seed executado! Luan agora é ENGENHEIRO.',
+      users: ['luandeleon@estrutto.com.br (ENGINEER)', 'roberto@estrutto.com.br (CLIENT)', 'priscilla@estrutto.com.br (CLIENT)', 'marcelo@estrutto.com.br (CLIENT)']
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: error.message })
+  }
+})
 
 module.exports = app
