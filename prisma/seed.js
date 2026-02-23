@@ -9,10 +9,13 @@ async function main() {
   const engineerHash = await bcrypt.hash('235863', 10)
   const clientHash = await bcrypt.hash('121314', 10)
 
-  // ENGENHEIRO
+  // ENGENHEIRO - AGORA ATUALIZA O TYPE TAMBÉM!
   const engineer = await prisma.user.upsert({
     where: { email: 'luandeleon@estrutto.com.br' },
-    update: { password: engineerHash },
+    update: { 
+      password: engineerHash,
+      type: 'ENGINEER'  // ← AGORA ATUALIZA PARA ENGENHEIRO!
+    },
     create: {
       email: 'luandeleon@estrutto.com.br',
       name: 'Luan de Leon',
@@ -20,12 +23,15 @@ async function main() {
       type: 'ENGINEER'
     }
   })
-  console.log(`✅ Engenheiro: ${engineer.name}`)
+  console.log(`✅ Engenheiro: ${engineer.name} (${engineer.type})`)
 
   // APOIO
   await prisma.user.upsert({
     where: { email: 'apoio@estrutto.com.br' },
-    update: { password: clientHash },
+    update: { 
+      password: clientHash,
+      type: 'ENGINEER' 
+    },
     create: {
       email: 'apoio@estrutto.com.br',
       name: 'Apoio Administrativo',
@@ -45,8 +51,16 @@ async function main() {
   for (const c of clientes) {
     await prisma.user.upsert({
       where: { email: c.email },
-      update: { password: clientHash },
-      create: { email: c.email, name: c.name, password: clientHash, type: 'CLIENT' }
+      update: { 
+        password: clientHash,
+        type: 'CLIENT' 
+      },
+      create: { 
+        email: c.email, 
+        name: c.name, 
+        password: clientHash, 
+        type: 'CLIENT' 
+      }
     })
     console.log(`✅ Cliente: ${c.name}`)
   }
@@ -54,7 +68,7 @@ async function main() {
   // DELETAR OBRAS ANTIGAS
   await prisma.obra.deleteMany({ where: { engineerId: engineer.id } })
 
-  // PRISCILLA - 6 ETAPAS (5 semanas)
+  // PRISCILLA - 6 ETAPAS
   await prisma.obra.create({
     data: {
       id: 202,
@@ -81,7 +95,7 @@ async function main() {
   })
   console.log(`✅ Obra Priscilla criada (6 etapas)`)
 
-  // MARCELO - 11 ETAPAS (6 concluídas, 1 em andamento, 4 pendentes)
+  // MARCELO - 11 ETAPAS
   await prisma.obra.create({
     data: {
       id: 101,
@@ -113,7 +127,7 @@ async function main() {
   })
   console.log(`✅ Obra Marcelo criada (11 etapas)`)
 
-  // ROBERTO - 7 ETAPAS (70 dias)
+  // ROBERTO - 7 ETAPAS
   await prisma.obra.create({
     data: {
       id: 404,

@@ -627,12 +627,18 @@ app.get('/api/run-seed', async (req, res) => {
 
 // Rota para verificar dados (acessar pelo navegador)
 app.get('/api/check-data', async (req, res) => {
-  const obras = await prisma.obra.findMany({
-    include: { etapas: true, user: true }
-  })
-  const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, type: true }
-  })
+ const obra = await prisma.obra.create({
+  data: {
+    name: req.body.name,
+    clientName: req.body.clientName,
+    userId: req.body.userId,  // ✅ CORRIGIDO
+    address: req.body.address
+  },
+  include: {
+    user: true,
+    etapas: true
+  }
+})
   
   res.json({
     totalObras: obras.length,
