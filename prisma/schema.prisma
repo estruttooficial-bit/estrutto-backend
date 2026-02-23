@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id       Int     @id @default(autoincrement())
+  email    String  @unique
+  password String
+  name     String
+  type     String  // 'cliente' ou 'engenheiro'
+  obraId   Int?
+  obras    Obra[]  @relation("EngenheiroObras")
+}
+
+model Obra {
+  id           Int      @id @default(autoincrement())
+  name         String
+  clientName   String
+  address      String?
+  progress     Int      @default(0)
+  status       String   @default("em_andamento")
+  startDate    String?
+  estimatedEnd String?
+  engineerId   Int
+  engineer     User     @relation("EngenheiroObras", fields: [engineerId], references: [id])
+}
+
+model Foto {
+  id       Int    @id @default(autoincrement())
+  obraId   Int
+  url      String
+  caption  String?
+  date     String
+  category String @default("geral")
+}
+
+model Etapa {
+  id          Int      @id @default(autoincrement())
+  obraId      Int
+  phase       String
+  description String
+  status      String
+  progress    Int
+}
