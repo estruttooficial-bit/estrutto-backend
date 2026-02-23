@@ -1,65 +1,46 @@
 const { PrismaClient } = require('@prisma/client')
-const bcrypt = require('bcryptjs')
 const prisma = new PrismaClient()
 
 async function main() {
-  console.log('🏗️ Sincronizando Banco de Dados Estrutto v3...')
+  console.log('🏗️ Sincronizando Banco de Dados Estrutto...')
 
-  // 1. HASH DAS SENHAS
-  const engineerPasswordHash = await bcrypt.hash('235863', 10)
-  const clientPasswordHash = await bcrypt.hash('121314', 10)
-
-  // 2. LISTA DE CLIENTES
-  const listaDeClientes = [
-    { email: 'marcelo@estrutto.com.br', name: 'Marcelo' },
-    { email: 'roberto@estrutto.com.br', name: 'Roberto' },
-    { email: 'priscilla@estrutto.com.br', name: 'Priscilla Blattner' }
-  ]
-
-  // 3. CRIAR/ATUALIZAR ENGENHEIRO
+  // 2. CRIAR/ATUALIZAR ENGENHEIRO
   const engineer = await prisma.user.upsert({
     where: { email: 'luandeleon@estrutto.com.br' },
     update: { 
       name: 'Luan de Leon',
-      password: engineerPasswordHash,
       type: 'ENGINEER'
     },
     create: {
       email: 'luandeleon@estrutto.com.br',
       name: 'Luan de Leon',
-      password: engineerPasswordHash,
+      password: '235863',
       type: 'ENGINEER'
     }
   })
   console.log(`✅ Engenheiro: ${engineer.name}`)
 
-  // 4. CRIAR/ATUALIZAR CLIENTES
-  for (const c of listaDeClientes) {
-    const client = await prisma.user.upsert({
+  // 3. CRIAR/ATUALIZAR CLIENTES
+  const clientes = [
+    { email: 'marcelo@estrutto.com.br', name: 'Marcelo' },
+    { email: 'roberto@estrutto.com.br', name: 'Roberto' },
+    { email: 'priscilla@estrutto.com.br', name: 'Priscilla Blattner' }
+  ]
+
+  for (const c of clientes) {
+    await prisma.user.upsert({
       where: { email: c.email },
-      update: { 
-        name: c.name,
-        password: clientPasswordHash,
-        type: 'CLIENT'
-      },
-      create: {
-        email: c.email,
-        name: c.name,
-        password: clientPasswordHash,
-        type: 'CLIENT'
-      }
+      update: { name: c.name, type: 'CLIENT' },
+      create: { email: c.email, name: c.name, password: '121314', type: 'CLIENT' }
     })
-    console.log(`✅ Cliente: ${client.name}`)
+    console.log(`✅ Cliente: ${c.name}`)
   }
 
-  // 5. DELETAR OBRAS ANTIGAS (evita duplicatas)
-  await prisma.obra.deleteMany({
-    where: { engineerId: engineer.id }
-  })
-  console.log('🗑️ Obras antigas removidas')
+  // 4. DELETAR OBRAS ANTIGAS
+  await prisma.obra.deleteMany({ where: { engineerId: engineer.id } })
 
-  // 6. OBRA PRISCILLA (Apto 906)
-  const obraPriscilla = await prisma.obra.create({
+  // 5. OBRA PRISCILLA
+  await prisma.obra.create({
     data: {
       id: 202,
       name: "Reforma Residencial - Apto 906",
@@ -75,29 +56,14 @@ async function main() {
 
   await prisma.etapa.createMany({
     data: [
-      { 
-        phase: "S1: Início e Mobilização", 
-        description: "PAGAMENTO AMANHÃ: R$ 6.000,00. Proteção e organização.", 
-        status: "em_andamento", 
-        progress: 15, 
-        obraId: 202,
-        budget: 6000,
-        spent: 2000
-      },
-      { 
-        phase: "S2: Demolição", 
-        description: "Vencimento: R$ 3.100,00 em 28/02.", 
-        status: "pendente", 
-        progress: 0, 
-        obraId: 202,
-        budget: 3100
-      }
+      { phase: "S1: Início e Mobilização", description: "PAGAMENTO AMANHÃ: R$ 6.000,00.", status: "em_andamento", progress: 15, obraId: 202, budget: 6000 },
+      { phase: "S2: Demolição", description: "Vencimento: R$ 3.100,00 em 28/02.", status: "pendente", progress: 0, obraId: 202, budget: 3100 }
     ]
   })
-  console.log(`✅ Obra Priscilla criada: ${obraPriscilla.name}`)
+  console.log(`✅ Obra Priscilla criada`)
 
-  // 7. OBRA MARCELO (Parrilla)
-  const obraMarcelo = await prisma.obra.create({
+  // 6. OBRA MARCELO
+  await prisma.obra.create({
     data: {
       id: 101,
       name: "Espaço Gourmet & Parrilla",
@@ -113,21 +79,13 @@ async function main() {
 
   await prisma.etapa.createMany({
     data: [
-      { 
-        phase: "S7: Steel Frame + Gás", 
-        description: "Vencimento: R$ 4.200,00 em 27/02.", 
-        status: "em_andamento", 
-        progress: 20, 
-        obraId: 101,
-        budget: 4200,
-        spent: 3500
-      }
+      { phase: "S7: Steel Frame + Gás", description: "Vencimento: R$ 4.200,00 em 27/02.", status: "em_andamento", progress: 20, obraId: 101, budget: 4200 }
     ]
   })
-  console.log(`✅ Obra Marcelo criada: ${obraMarcelo.name}`)
+  console.log(`✅ Obra Marcelo criada`)
 
-  // 8. OBRA ROBERTO
-  const obraRoberto = await prisma.obra.create({
+  // 7. OBRA ROBERTO
+  await prisma.obra.create({
     data: {
       id: 404,
       name: "Reforma Geral - Roberto",
@@ -143,36 +101,14 @@ async function main() {
 
   await prisma.etapa.createMany({
     data: [
-      { 
-        phase: "P3: Fim Demolição", 
-        description: "Vencimento: R$ 2.250,00 em 26/02.", 
-        status: "em_andamento", 
-        progress: 10, 
-        obraId: 404,
-        budget: 2250
-      }
+      { phase: "P3: Fim Demolição", description: "Vencimento: R$ 2.250,00 em 26/02.", status: "em_andamento", progress: 10, obraId: 404, budget: 2250 }
     ]
   })
-  console.log(`✅ Obra Roberto criada: ${obraRoberto.name}`)
+  console.log(`✅ Obra Roberto criada`)
 
-  console.log('\n✨ SEED FINALIZADO COM SUCESSO!')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('📧 ENGENHEIRO:')
-  console.log('   Email: luandeleon@estrutto.com.br')
-  console.log('   Senha: 235863')
-  console.log('\n📧 CLIENTES:')
-  console.log('   marcelo@estrutto.com.br / 121314')
-  console.log('   roberto@estrutto.com.br / 121314')
-  console.log('   priscilla@estrutto.com.br / 121314')
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  console.log('🔐 Todas as senhas estão com hash bcrypt\n')
+  console.log('\n✨ SEED FINALIZADO!')
 }
 
 main()
-  .catch((e) => {
-    console.error('❌ Erro no Seed:', e.message)
-    process.exit(1)
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+  .catch((e) => { console.error('❌ Erro:', e); process.exit(1) })
+  .finally(async () => { await prisma.$disconnect() })

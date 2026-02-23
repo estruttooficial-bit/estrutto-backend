@@ -1,50 +1,64 @@
 const { PrismaClient } = require('@prisma/client')
+const bcrypt = require('bcryptjs')
 const prisma = new PrismaClient()
 
 async function main() {
   console.log('🏗️ Sincronizando Banco de Dados Estrutto...')
 
-  // 1. DEFINIÇÃO DA LISTA DE CLIENTES
+  // 1. HASH DAS SENHAS
+  const engineerPasswordHash = await bcrypt.hash('235863', 10)
+  const clientPasswordHash = await bcrypt.hash('121314', 10)
+
+  // 2. LISTA DE CLIENTES
   const listaDeClientes = [
     { email: 'marcelo@estrutto.com.br', name: 'Marcelo' },
     { email: 'roberto@estrutto.com.br', name: 'Roberto' },
     { email: 'priscilla@estrutto.com.br', name: 'Priscilla Blattner' }
   ]
 
-  // 2. CRIAR/ATUALIZAR SEU USUÁRIO (ENGENHEIRO)
+  // 3. CRIAR/ATUALIZAR ENGENHEIRO
   const engineer = await prisma.user.upsert({
     where: { email: 'luandeleon@estrutto.com.br' },
     update: { 
-      password: '235863' // Garante que a senha seja atualizada
+      name: 'Luan de Leon',
+      password: engineerPasswordHash,
+      type: 'ENGINEER'
     },
     create: {
       email: 'luandeleon@estrutto.com.br',
       name: 'Luan de Leon',
-      password: '235863', 
+      password: engineerPasswordHash,
       type: 'ENGINEER'
     }
   })
+  console.log(`✅ Engenheiro: ${engineer.name}`)
 
-  // 3. CRIAR/ATUALIZAR USUÁRIOS DOS CLIENTES
+  // 4. CRIAR/ATUALIZAR CLIENTES
   for (const c of listaDeClientes) {
-    await prisma.user.upsert({
+    const client = await prisma.user.upsert({
       where: { email: c.email },
       update: { 
-        password: '121314' // Garante que a senha seja atualizada
+        name: c.name,
+        password: clientPasswordHash,
+        type: 'CLIENT'
       },
       create: {
         email: c.email,
         name: c.name,
-        password: '121314',
+        password: clientPasswordHash,
         type: 'CLIENT'
       }
     })
+    console.log(`✅ Cliente: ${client.name}`)
   }
 
-  // 4. LIMPEZA DE OBRAS PARA EVITAR DUPLICADOS
-  await prisma.obra.deleteMany({ where: { engineerId: engineer.id } })
+  // 5. DELETAR OBRAS ANTIGAS
+  await prisma.obra.deleteMany({
+    where: { engineerId: engineer.id }
+  })
+  console.log('🗑️ Obras antigas removidas')
 
-  // 5. INSERINDO OBRA: PRISCILLA (Apto 906)
+  // 6. OBRA PRISCILLA
   const obraPriscilla = await prisma.obra.create({
     data: {
       id: 202,
@@ -61,12 +75,13 @@ async function main() {
 
   await prisma.etapa.createMany({
     data: [
-      { phase: "S1: Início e Mobilização", description: "PAGAMENTO AMANHÃ: R$ 6.000,00. Proteção e organização.", status: "em_andamento", progress: 15, obraId: 202 },
-      { phase: "S2: Demolição", description: "Vencimento: R$ 3.100,00 em 28/02.", status: "pendente", progress: 0, obraId: 202 }
+      { phase: "S1: Início e Mobilização", description: "PAGAMENTO AMANHÃ: R$ 6.000,00. Proteção e organização.", status: "em_andamento", progress: 15, obraId: 202, budget: 6000, spent: 0 },
+      { phase: "S2: Demolição", description: "Vencimento: R$ 3.100,00 em 28/02.", status: "pendente", progress: 0, obraId: 202, budget: 3100, spent: 0 }
     ]
   })
+  console.log(`✅ Obra Priscilla criada: ${obraPriscilla.name}`)
 
-  // 6. INSERINDO OBRA: MARCELO (Parrilla)
+  // 7. OBRA MARCELO
   const obraMarcelo = await prisma.obra.create({
     data: {
       id: 101,
@@ -83,11 +98,12 @@ async function main() {
 
   await prisma.etapa.createMany({
     data: [
-      { phase: "S7: Steel Frame + Gás", description: "Vencimento: R$ 4.200,00 em 27/02.", status: "em_andamento", progress: 20, obraId: 101 }
+      { phase: "S7: Steel Frame + Gás", description: "Vencimento: R$ 4.200,00 em 27/02.", status: "em_andamento", progress: 20, obraId: 101, budget: 4200, spent: 0 }
     ]
   })
+  console.log(`✅ Obra Marcelo criada: ${obraMarcelo.name}`)
 
-  // 7. INSERINDO OBRA: ROBERTO
+  // 8. OBRA ROBERTO
   const obraRoberto = await prisma.obra.create({
     data: {
       id: 404,
@@ -104,11 +120,12 @@ async function main() {
 
   await prisma.etapa.createMany({
     data: [
-      { phase: "P3: Fim Demolição", description: "Vencimento: R$ 2.250,00 em 26/02.", status: "em_andamento", progress: 10, obraId: 404 }
+      { phase: "P3: Fim Demolição", description: "Vencimento: R$ 2.250,00 em 26/02.", status: "em_andamento", progress: 10, obraId: 404, budget: 2250, spent: 0 }
     ]
   })
+  console.log(`✅ Obra Roberto criada: ${obraRoberto.name}`)
 
-  console.log('🚀 SEED FINALIZADO: Obras e Senhas atualizadas!')
+  console.log('\n✨ SEED FINALIZADO COM SUCESSO!')
 }
 
 main()
