@@ -36,9 +36,9 @@ model Obra {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  // Relacionamento com Engenheiro
-  engineerId   Int
-  engineer     User      @relation("EngenheiroObras", fields: [engineerId], references: [id], onDelete: Cascade)
+  // Relacionamento com User (antigo engineer)
+  userId       Int
+  user         User      @relation("EngenheiroObras", fields: [userId], references: [id], onDelete: Cascade)
 
   // Relacionamentos com outras entidades
   etapas       Etapa[]   @relation("ObraEtapas")
@@ -46,7 +46,7 @@ model Obra {
   mensagens    Mensagem[] @relation("ObraMensagens")
   rdos         RDO[]     @relation("ObraRDOs")
 
-  @@index([engineerId])
+  @@index([userId])
 }
 
 model Etapa {
