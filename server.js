@@ -695,5 +695,33 @@ process.on('SIGINT', async () => {
   await prisma.$disconnect()
   process.exit(0)
 })
+// GET progresso/cronograma de uma obra (ETAPAS)
+app.get('/api/obras/:id/progresso', authMiddleware, async (req, res) => {
+  try {
+    const etapas = await prisma.etapa.findMany({
+      where: { obraId: parseInt(req.params.id) },
+      orderBy: { createdAt: 'asc' }
+    });
+    res.json(etapas);
+  } catch (error) {
+    console.error('Erro ao buscar progresso:', error);
+    res.status(500).json({ error: 'Erro ao buscar progresso' });
+  }
+});
 
+// GET chat/mensagens de uma obra
+app.get('/api/obras/:id/chat', authMiddleware, async (req, res) => {
+  try {
+    const mensagens = await prisma.mensagem.findMany({
+      where: { obraId: parseInt(req.params.id) },
+      include: { user: { select: { id: true, name: true, type: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
+    res.json(mensagens);
+  } catch (error) {
+    console.error('Erro ao buscar chat:', error);
+    res.status(500).json({ error: 'Erro ao buscar chat' });
+  }
+});
 module.exports = app
