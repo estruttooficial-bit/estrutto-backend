@@ -1,26 +1,28 @@
 const { PrismaClient } = require('@prisma/client')
+const bcrypt = require('bcryptjs')
 const prisma = new PrismaClient()
 
 async function main() {
   console.log('🏗️ Sincronizando Banco de Dados Estrutto...')
 
-  // 2. CRIAR/ATUALIZAR ENGENHEIRO
+  // HASH DAS SENHAS
+  const engineerHash = await bcrypt.hash('235863', 10)
+  const clientHash = await bcrypt.hash('121314', 10)
+
+  // ENGENHEIRO
   const engineer = await prisma.user.upsert({
     where: { email: 'luandeleon@estrutto.com.br' },
-    update: { 
-      name: 'Luan de Leon',
-      type: 'ENGINEER'
-    },
+    update: { password: engineerHash },
     create: {
       email: 'luandeleon@estrutto.com.br',
       name: 'Luan de Leon',
-      password: '235863',
+      password: engineerHash,
       type: 'ENGINEER'
     }
   })
   console.log(`✅ Engenheiro: ${engineer.name}`)
 
-  // 3. CRIAR/ATUALIZAR CLIENTES
+  // CLIENTES
   const clientes = [
     { email: 'marcelo@estrutto.com.br', name: 'Marcelo' },
     { email: 'roberto@estrutto.com.br', name: 'Roberto' },
@@ -30,16 +32,16 @@ async function main() {
   for (const c of clientes) {
     await prisma.user.upsert({
       where: { email: c.email },
-      update: { name: c.name, type: 'CLIENT' },
-      create: { email: c.email, name: c.name, password: '121314', type: 'CLIENT' }
+      update: { password: clientHash },
+      create: { email: c.email, name: c.name, password: clientHash, type: 'CLIENT' }
     })
     console.log(`✅ Cliente: ${c.name}`)
   }
 
-  // 4. DELETAR OBRAS ANTIGAS
+  // DELETAR OBRAS ANTIGAS
   await prisma.obra.deleteMany({ where: { engineerId: engineer.id } })
 
-  // 5. OBRA PRISCILLA
+  // PRISCILLA
   await prisma.obra.create({
     data: {
       id: 202,
@@ -62,7 +64,7 @@ async function main() {
   })
   console.log(`✅ Obra Priscilla criada`)
 
-  // 6. OBRA MARCELO
+  // MARCELO
   await prisma.obra.create({
     data: {
       id: 101,
@@ -84,7 +86,7 @@ async function main() {
   })
   console.log(`✅ Obra Marcelo criada`)
 
-  // 7. OBRA ROBERTO
+  // ROBERTO
   await prisma.obra.create({
     data: {
       id: 404,
