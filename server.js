@@ -647,5 +647,28 @@ app.get('/api/check-data', async (req, res) => {
     }))
   })
 })
-
+// Rota de emergência - acesse pelo navegador
+app.get('/fix', async (req, res) => {
+  try {
+    // 1. Corrige Luan para ENGENHEIRO
+    await prisma.user.updateMany({
+      where: { email: 'luandeleon@estrutto.com.br' },
+      data: { type: 'ENGINEER' }
+    })
+    
+    // 2. Verifica se tem etapas
+    const etapas = await prisma.etapa.count()
+    const obras = await prisma.obra.count()
+    
+    res.send(`
+      <h1>✅ Corrigido!</h1>
+      <p>Luan agora é ENGENHEIRO</p>
+      <p>Obras: ${obras} | Etapas: ${etapas}</p>
+      <p><b>Se Etapas = 0, o seed não funcionou. Rode o seed.js localmente e faça push.</b></p>
+      <p>Faça logout e login no app agora!</p>
+    `)
+  } catch (e) {
+    res.send(`Erro: ${e.message}`)
+  }
+})
 module.exports = app
