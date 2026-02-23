@@ -88,10 +88,9 @@ app.get('/api/obras', authMiddleware, async (req, res) => {
     
     if (user.type === 'ENGINEER') {
       // Engenheiro vê obras onde é responsável
-      whereClause = { engineerId: user.id }
+      whereClause = { userId: user.id }  // ✅ CORRIGIDO: engineerId → userId
     } else {
       // Cliente vê obras onde o nome está em clientName
-      // Busca case-insensitive parcial (funciona com "Roberto" em "Roberto e Wendel")
       whereClause = {
         clientName: {
           contains: user.name,
@@ -103,8 +102,11 @@ app.get('/api/obras', authMiddleware, async (req, res) => {
     const obras = await prisma.obra.findMany({
       where: whereClause,
       include: { 
+        user: true,  // ✅ ADICIONADO: inclui dados do usuário/engenheiro
         etapas: true, 
         fotos: true,
+        mensagens: true,  // ✅ ADICIONADO
+        rdos: true,       // ✅ ADICIONADO
         _count: { select: { mensagens: true } }
       },
       orderBy: { updatedAt: 'desc' }
@@ -130,7 +132,7 @@ app.get('/api/obras/:id', authMiddleware, async (req, res) => {
           orderBy: { createdAt: 'desc' }
         },
         rdos: { orderBy: { date: 'desc' } },
-        engineer: { select: { id: true, name: true, email: true } }
+        user: { select: { id: true, name: true, email: true } }  // ✅ CORRIGIDO: engineer → user
       }
     })
     
@@ -163,7 +165,7 @@ app.post('/api/obras', authMiddleware, async (req, res) => {
         address,
         startDate,
         estimatedEnd,
-        engineerId: req.user.id,
+        userId: req.user.id,  // ✅ CORRIGIDO: engineerId → userId
         status: 'em_andamento',
         progress: 0
       }
@@ -524,23 +526,7 @@ app.get('/api/health', (req, res) => {
   })
 })
 
-// ─── INICIAR SERVIDOR ───
-server.listen(PORT, () => {
-  console.log(`\n🚀 Servidor Estrutto v3.0 rodando na porta ${PORT}`)
-  console.log(`📊 Conectado ao PostgreSQL (Supabase)`)
-  console.log(`☁️ Cloudinary ativo para uploads`)
-  console.log(`🔌 Socket.io ativo para notificações em tempo real`)
-  console.log(`🔐 JWT autenticação ativa\n`)
-})
-
-// ─── TRATAMENTO DE ERROS NÃO CAPTURADOS ───
-process.on('SIGINT', async () => {
-  console.log('\n🛑 Encerrando servidor...')
-  await prisma.$disconnect()
-  process.exit(0)
-})
 // ─── ROTA TEMPORÁRIA PARA SEED ───
-// Acesse: https://estrutto-backend.onrender.com/api/run-seed?key=estrutto2026
 app.get('/api/run-seed', async (req, res) => {
   if (req.query.key !== 'estrutto2026') {
     return res.status(401).json({ error: 'Chave incorreta' })
@@ -569,7 +555,7 @@ app.get('/api/run-seed', async (req, res) => {
         email: 'luandeleon@estrutto.com.br',
         password: senhaLuan,
         name: 'Luan de Leon',
-        type: 'ENGINEER', // ← ENGENHEIRO!
+        type: 'ENGINEER',
       }
     })
 
@@ -611,13 +597,27 @@ app.get('/api/run-seed', async (req, res) => {
 
     console.log('✅ Usuários criados')
 
-    // Criar obras e etapas... (cola o resto do seu seed aqui)
-    // Ou simplifica: só crie as obras básicas primeiro para testar
-    
+    // Criar obra de exemplo para o Marcelo
+    const obra = await prisma.obra.create({
+      data: {
+        name: 'Reforma Área Externa - Marcelo Bronzatto',
+        clientName: 'Marcelo Bronzatto',
+        address: 'Rua Professor Ulisses Cabral 1121, Porto Alegre/RS',
+        userId: luan.id,  // Luan como engenheiro responsável
+        status: 'em_andamento',
+        progress: 55,
+        startDate: '12/01/2026',
+        estimatedEnd: '27/03/2026'
+      }
+    })
+
+    console.log('✅ Obra criada')
+
     res.json({ 
       success: true, 
-      message: 'Seed executado! Luan agora é ENGENHEIRO.',
-      users: ['luandeleon@estrutto.com.br (ENGINEER)', 'roberto@estrutto.com.br (CLIENT)', 'priscilla@estrutto.com.br (CLIENT)', 'marcelo@estrutto.com.br (CLIENT)']
+      message: 'Seed executado! Dados recriados.',
+      users: ['luandeleon@estrutto.com.br (ENGINEER)', 'roberto@estrutto.com.br (CLIENT)', 'priscilla@estrutto.com.br (CLIENT)', 'marcelo@estrutto.com.br (CLIENT)'],
+      obra: obra.name
     })
   } catch (error) {
     console.error(error)
@@ -625,56 +625,75 @@ app.get('/api/run-seed', async (req, res) => {
   }
 })
 
-// Rota para verificar dados (acessar pelo navegador)
+// Rota para verificar dados
 app.get('/api/check-data', async (req, res) => {
- const obra = await prisma.obra.create({
-  data: {
-    name: req.body.name,
-    clientName: req.body.clientName,
-    userId: req.body.userId,  // ✅ CORRIGIDO
-    address: req.body.address
-  },
-  include: {
-    user: true,
-    etapas: true
+  try {
+    const obras = await prisma.obra.findMany({
+      include: {
+        user: true,
+        etapas: true,
+        _count: { select: { mensagens: true } }
+      }
+    })
+    
+    const users = await prisma.user.findMany({
+      select: { id: true, name: true, email: true, type: true }
+    })
+    
+    res.json({
+      totalObras: obras.length,
+      totalUsuarios: users.length,
+      usuarios: users,
+      obras: obras.map(o => ({
+        nome: o.name,
+        cliente: o.clientName,
+        engenheiro: o.user?.name,
+        etapasCount: o.etapas.length,
+        progresso: o.progress,
+        temEtapas: o.etapas.length > 0
+      }))
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
   }
 })
-  
-  res.json({
-    totalObras: obras.length,
-    totalUsuarios: users.length,
-    usuarios: users,
-    obras: obras.map(o => ({
-      nome: o.name,
-      cliente: o.clientName,
-      etapasCount: o.etapas.length,
-      progresso: o.progress,
-      temEtapas: o.etapas.length > 0
-    }))
-  })
-})
-// Rota de emergência - acesse pelo navegador
+
+// Rota de emergência
 app.get('/fix', async (req, res) => {
   try {
-    // 1. Corrige Luan para ENGENHEIRO
     await prisma.user.updateMany({
       where: { email: 'luandeleon@estrutto.com.br' },
       data: { type: 'ENGINEER' }
     })
     
-    // 2. Verifica se tem etapas
     const etapas = await prisma.etapa.count()
     const obras = await prisma.obra.count()
     
     res.send(`
       <h1>✅ Corrigido!</h1>
-      <p>Luan agora é ENGENHEIRO</p>
+      <p>Luan agora é ENGENGEIRO</p>
       <p>Obras: ${obras} | Etapas: ${etapas}</p>
-      <p><b>Se Etapas = 0, o seed não funcionou. Rode o seed.js localmente e faça push.</b></p>
       <p>Faça logout e login no app agora!</p>
     `)
   } catch (e) {
     res.send(`Erro: ${e.message}`)
   }
 })
+
+// ─── INICIAR SERVIDOR ───
+server.listen(PORT, () => {
+  console.log(`\n🚀 Servidor Estrutto v3.0 rodando na porta ${PORT}`)
+  console.log(`📊 Conectado ao PostgreSQL (Supabase)`)
+  console.log(`☁️ Cloudinary ativo para uploads`)
+  console.log(`🔌 Socket.io ativo para notificações em tempo real`)
+  console.log(`🔐 JWT autenticação ativa\n`)
+})
+
+// ─── TRATAMENTO DE ERROS NÃO CAPTURADOS ───
+process.on('SIGINT', async () => {
+  console.log('\n🛑 Encerrando servidor...')
+  await prisma.$disconnect()
+  process.exit(0)
+})
+
 module.exports = app
