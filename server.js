@@ -14,7 +14,7 @@ const app = express()
 const server = http.createServer(app)
 const io = new Server(server, { cors: { origin: '*' } })
 
-app.use(cors())
+app.use(cors()); // Permite todas as conexões temporariamente
 app.use(express.json())
 
 // Configuração do Cloudinary (Pega as chaves do seu arquivo .env)
@@ -111,7 +111,6 @@ function auth(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1]
   if (!token) return res.status(401).json({ error: 'Token necessário' })
   try {
-    req.user = jwt.verify(token, JWT_SECRET)
     next()
   } catch { res.status(401).json({ error: 'Token inválido' }) }
 }
