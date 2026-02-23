@@ -4,21 +4,17 @@
   "description": "Backend para aplicação de gerenciamento de obras - Estrutto Engenharia",
   "main": "server.js",
   "scripts": {
-    "build": "prisma generate && npm run migrate:prod",
+    "prebuild": "npx prisma generate",
+    "build": "echo 'Build complete'",
     "dev": "node --watch server.js",
-    "start": "prisma generate && node server.js",
+    "start": "npx prisma generate && npx prisma migrate deploy && node server.js",
     "seed": "node prisma/seed.js",
     "migrate": "prisma migrate dev",
     "migrate:prod": "prisma migrate deploy",
     "studio": "prisma studio",
     "db:reset": "prisma migrate reset"
   },
-  "keywords": [
-    "construction",
-    "obras",
-    "engineering",
-    "management"
-  ],
+  "keywords": ["construction", "obras", "engineering", "management"],
   "author": "Luan de Leon",
   "license": "ISC",
   "dependencies": {
