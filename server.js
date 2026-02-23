@@ -80,11 +80,28 @@ app.post('/api/auth/login', async (req, res) => {
 })
 
 // ─── OBRAS ───
-// GET todas as obras do engenheiro
+// GET todas as obras (FILTRA POR TIPO DE USUÁRIO)
 app.get('/api/obras', authMiddleware, async (req, res) => {
   try {
+    const user = req.user
+    let whereClause = {}
+    
+    if (user.type === 'ENGINEER') {
+      // Engenheiro vê obras onde é responsável
+      whereClause = { engineerId: user.id }
+    } else {
+      // Cliente vê obras onde o nome está em clientName
+      // Busca case-insensitive parcial (funciona com "Roberto" em "Roberto e Wendel")
+      whereClause = {
+        clientName: {
+          contains: user.name,
+          mode: 'insensitive'
+        }
+      }
+    }
+    
     const obras = await prisma.obra.findMany({
-      where: { engineerId: req.user.id },
+      where: whereClause,
       include: { 
         etapas: true, 
         fotos: true,
@@ -92,6 +109,7 @@ app.get('/api/obras', authMiddleware, async (req, res) => {
       },
       orderBy: { updatedAt: 'desc' }
     })
+    
     res.json(obras)
   } catch (error) {
     console.error('Erro ao buscar obras:', error)
@@ -117,6 +135,15 @@ app.get('/api/obras/:id', authMiddleware, async (req, res) => {
     })
     
     if (!obra) return res.status(404).json({ error: 'Obra não encontrada' })
+    
+    // Verifica permissão: se for cliente, só vê se for o cliente da obra
+    if (req.user.type === 'CLIENT') {
+      const isClient = obra.clientName.toLowerCase().includes(req.user.name.toLowerCase())
+      if (!isClient) {
+        return res.status(403).json({ error: 'Acesso negado' })
+      }
+    }
+    
     res.json(obra)
   } catch (error) {
     console.error('Erro ao buscar obra:', error)
