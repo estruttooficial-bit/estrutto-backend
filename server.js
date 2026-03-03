@@ -87,8 +87,9 @@ app.get('/api/obras', authMiddleware, async (req, res) => {
     let whereClause = {}
     
     if (user.type === 'ENGINEER') {
-      // Engenheiro vê obras onde é responsável
-      whereClause = { userId: user.id }  // ✅ CORRIGIDO: engineerId → userId
+      whereClause = { userId: user.id }
+    } else if (user.type === 'APOIO') {
+      whereClause = {} // Apoio vê todas as obras
     } else {
       // Cliente vê obras onde o nome está em clientName
       whereClause = {
@@ -565,7 +566,7 @@ app.get('/api/run-seed', async (req, res) => {
         email: 'apoio@estrutto.com.br',
         password: senhaApoio,
         name: 'Apoio Administrativo',
-        type: 'ENGINEER',
+        type: 'APOIO',
       }
     })
 
@@ -865,7 +866,7 @@ app.get('/api/run-seed', async (req, res) => {
     res.json({
       success: true,
       message: 'Seed executado! Dados recriados.',
-      users: ['luandeleon@estrutto.com.br (ENGINEER)', 'roberto@estrutto.com.br (CLIENT)', 'priscilla@estrutto.com.br (CLIENT)', 'marcelo@estrutto.com.br (CLIENT)'],
+      users: ['luandeleon@estrutto.com.br (ENGINEER)', 'apoio@estrutto.com.br (APOIO)', 'roberto@estrutto.com.br (CLIENT)', 'priscilla@estrutto.com.br (CLIENT)', 'marcelo@estrutto.com.br (CLIENT)'],
       obras: [
         { nome: obra.name, etapas: 6, totalObra: 'R$ 46.010,00', recebido: 'R$ 29.871,25', saldo: 'R$ 16.138,75' },
         { nome: obraPri.name, etapas: 5, progresso: '32%' },
