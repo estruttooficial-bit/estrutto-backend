@@ -429,7 +429,7 @@ app.post('/api/mensagens', authMiddleware, async (req, res) => {
 // GET RDOs de uma obra
 app.get('/api/obras/:obraId/rdos', authMiddleware, async (req, res) => {
   try {
-    const rdos = await prisma.rdo.findMany({
+    const rdos = await prisma.rDO.findMany({
       where: { obraId: parseInt(req.params.obraId) },
       include: { user: { select: { id: true, name: true } } },
       orderBy: { date: 'desc' }
@@ -444,15 +444,15 @@ app.get('/api/obras/:obraId/rdos', authMiddleware, async (req, res) => {
 // POST criar RDO
 app.post('/api/rdos', authMiddleware, async (req, res) => {
   try {
-    const { obraId, date, content } = req.body
-    
-    const rdo = await prisma.rdo.create({
+    const { obraId, date, content, status } = req.body
+
+    const rdo = await prisma.rDO.create({
       data: {
         obraId,
         date,
         content,
         userId: req.user.id,
-        status: 'rascunho'
+        status: status || 'rascunho'
       },
       include: { user: { select: { id: true, name: true } } }
     })
@@ -470,7 +470,7 @@ app.put('/api/rdos/:id', authMiddleware, async (req, res) => {
   try {
     const { content, status } = req.body
     
-    const rdo = await prisma.rdo.update({
+    const rdo = await prisma.rDO.update({
       where: { id: parseInt(req.params.id) },
       data: {
         ...(content && { content }),
@@ -536,7 +536,7 @@ app.get('/api/run-seed', async (req, res) => {
     const bcrypt = require('bcryptjs')
     
     // Limpar dados antigos
-    await prisma.rdo.deleteMany()
+    await prisma.rDO.deleteMany()
     await prisma.mensagem.deleteMany()
     await prisma.foto.deleteMany()
     await prisma.etapa.deleteMany()
@@ -603,9 +603,9 @@ app.get('/api/run-seed', async (req, res) => {
         name: 'Reforma Área Externa - Marcelo Bronzatto',
         clientName: 'Marcelo Bronzatto',
         address: 'Rua Professor Ulisses Cabral 1121, Porto Alegre/RS',
-        userId: luan.id,  // Luan como engenheiro responsável
+        userId: luan.id,
         status: 'em_andamento',
-        progress: 55,
+        progress: 64,
         startDate: '12/01/2026',
         estimatedEnd: '27/03/2026'
       }
@@ -613,11 +613,263 @@ app.get('/api/run-seed', async (req, res) => {
 
     console.log('✅ Obra criada')
 
-    res.json({ 
-      success: true, 
+    // Criar etapas do cronograma com dados financeiros reais
+    await prisma.etapa.createMany({
+      data: [
+        {
+          obraId: obra.id,
+          phase: 'S1-S6: Trabalhos Iniciais',
+          description: 'Demolição, impermeabilização, estrutura steel frame hidro, instalações iniciais',
+          startDate: '12/01/2026',
+          endDate: '21/02/2026',
+          budget: 25371.25,
+          spent: 25371.25,
+          status: 'concluída',
+          progress: 100
+        },
+        {
+          obraId: obra.id,
+          phase: 'S7: Estrutura e Fechamentos',
+          description: 'Steel frame 100% concluído, bancada gourmet estruturada, chapas cimentícias e placas OSB instaladas',
+          startDate: '23/02/2026',
+          endDate: '28/02/2026',
+          budget: 4500.00,
+          spent: 4500.00,
+          status: 'concluída',
+          progress: 100
+        },
+        {
+          obraId: obra.id,
+          phase: 'S8: Pedra Moledo e Infraestrutura',
+          description: 'Pedra Moledo (antecipada), infraestrutura de gás completa, revestimento bancada gourmet, limpeza grossa',
+          startDate: '02/03/2026',
+          endDate: '06/03/2026',
+          budget: 4300.00,
+          spent: 0,
+          status: 'em_andamento',
+          progress: 20
+        },
+        {
+          obraId: obra.id,
+          phase: 'S9: Estrutura e Revestimentos',
+          description: 'Estrutura muro fundos, piso porcelanato área principal + 11m², rejuntamento, proteção do piso',
+          startDate: '09/03/2026',
+          endDate: '13/03/2026',
+          budget: 4100.00,
+          spent: 0,
+          status: 'pendente',
+          progress: 0
+        },
+        {
+          obraId: obra.id,
+          phase: 'S10: Acabamentos Finos',
+          description: 'Cimento queimado muro fundos, instalações elétricas completas, sistema de gás, pinturas paredes laterais, arremates',
+          startDate: '16/03/2026',
+          endDate: '20/03/2026',
+          budget: 5100.00,
+          spent: 0,
+          status: 'pendente',
+          progress: 0
+        },
+        {
+          obraId: obra.id,
+          phase: 'S11: Entrega',
+          description: 'Troca vidro porta (1,23x2,35m laminado 4+4mm), revisão geral, limpeza pós-obra, check-list, entrega técnica ao cliente',
+          startDate: '23/03/2026',
+          endDate: '27/03/2026',
+          budget: 2638.75,
+          spent: 0,
+          status: 'pendente',
+          progress: 0
+        }
+      ]
+    })
+
+    console.log('✅ Etapas Marcelo criadas')
+
+    // ─── OBRA PRISCILLA BLATTNER ───
+    const obraPri = await prisma.obra.create({
+      data: {
+        name: 'Reforma Residencial – Apto 906 – Priscilla Blattner',
+        clientName: 'Priscilla Blattner',
+        address: 'Rua São Josemaria Escrivá, 740 – Apto 906, Jardim do Salso – Porto Alegre/RS',
+        userId: luan.id,
+        status: 'em_andamento',
+        progress: 32,
+        startDate: '23/02/2026',
+        estimatedEnd: '25/03/2026'
+      }
+    })
+
+    await prisma.etapa.createMany({
+      data: [
+        {
+          obraId: obraPri.id,
+          phase: 'S1: Preparação e Demolição',
+          description: 'Proteção e mobilização, retirada de rodapés, ajustes em drywall, limpeza grossa. Adiantado: tratamento de paredes (sala) e primer no contrapiso concluídos',
+          startDate: '23/02/2026',
+          endDate: '28/02/2026',
+          budget: 0,
+          spent: 0,
+          status: 'em_andamento',
+          progress: 80
+        },
+        {
+          obraId: obraPri.id,
+          phase: 'S2: Revestimentos Cerâmicos e Infraestrutura',
+          description: 'Instalação de revestimentos cerâmicos (cozinha, sala e banheiro). Reparos elétricos e acabamento de cortineiro conforme contrato',
+          startDate: '02/03/2026',
+          endDate: '07/03/2026',
+          budget: 0,
+          spent: 0,
+          status: 'em_andamento',
+          progress: 0
+        },
+        {
+          obraId: obraPri.id,
+          phase: 'S3: Tratamento de Superfícies e Pintura (1ª Demão)',
+          description: 'Fechamento de buracos, lixamento e nivelamento em todo apartamento. Aplicação de selador e 1ª demão de tinta nas cores escolhidas',
+          startDate: '09/03/2026',
+          endDate: '14/03/2026',
+          budget: 0,
+          spent: 0,
+          status: 'pendente',
+          progress: 0
+        },
+        {
+          obraId: obraPri.id,
+          phase: 'S4: Pisos e Acabamentos Finais',
+          description: 'Instalação de piso vinílico (94m²), instalação de rodapés novos (10cm), pintura 2ª demão e retoques finais',
+          startDate: '16/03/2026',
+          endDate: '21/03/2026',
+          budget: 0,
+          spent: 0,
+          status: 'pendente',
+          progress: 0
+        },
+        {
+          obraId: obraPri.id,
+          phase: 'S5: Entrega Técnica',
+          description: 'Limpeza fina de obra, vistoria final pelo Eng. Civil Luan de Leon, emissão de ART e assinatura do Termo de Recebimento de Obra',
+          startDate: '23/03/2026',
+          endDate: '25/03/2026',
+          budget: 0,
+          spent: 0,
+          status: 'pendente',
+          progress: 0
+        }
+      ]
+    })
+
+    console.log('✅ Obra Priscilla criada')
+
+    // ─── OBRA ROBERTO (WENDEL E ROBERTO) ───
+    const obraRob = await prisma.obra.create({
+      data: {
+        name: 'Reforma Residencial – Wendel e Roberto',
+        clientName: 'Roberto',
+        address: 'Porto Alegre/RS',
+        userId: luan.id,
+        status: 'em_andamento',
+        progress: 14,
+        startDate: '23/02/2026',
+        estimatedEnd: '05/05/2026'
+      }
+    })
+
+    await prisma.etapa.createMany({
+      data: [
+        {
+          obraId: obraRob.id,
+          phase: 'Fase 1: Demolição e Preparação',
+          description: 'Demolição revestimentos cozinha e banheiro, retirada de forros e portas, limpeza, demarcação técnica e revisão geral. Inclui aditivo parede cozinha (R$ 1.800)',
+          startDate: '23/02/2026',
+          endDate: '02/03/2026',
+          budget: 11200.00,
+          spent: 8950.00,
+          status: 'concluída',
+          progress: 100
+        },
+        {
+          obraId: obraRob.id,
+          phase: 'Fase 2: Infraestrutura',
+          description: 'Abertura de rasgos e instalação de eletrodutos, fechamento elétrica, tubulação hidráulica cozinha, quadro de distribuição, testes elétricos e preparação de contrapiso',
+          startDate: '03/03/2026',
+          endDate: '12/03/2026',
+          budget: 2250.00,
+          spent: 0,
+          status: 'em_andamento',
+          progress: 10
+        },
+        {
+          obraId: obraRob.id,
+          phase: 'Fase 3: Contrapisos',
+          description: 'Execução de contrapisos em cozinha, banheiro, sala e quartos. Cura, proteção e preparação das bases para revestimentos',
+          startDate: '13/03/2026',
+          endDate: '22/03/2026',
+          budget: 4500.00,
+          spent: 0,
+          status: 'pendente',
+          progress: 0
+        },
+        {
+          obraId: obraRob.id,
+          phase: 'Fase 4: Impermeabilização e Gesso',
+          description: 'Impermeabilização banheiro (2 demãos + teste 48h), estrutura e placas de gesso em cozinha, banheiro e área de serviço, sanca sala com infraestrutura LED',
+          startDate: '23/03/2026',
+          endDate: '05/04/2026',
+          budget: 4500.00,
+          spent: 0,
+          status: 'pendente',
+          progress: 0
+        },
+        {
+          obraId: obraRob.id,
+          phase: 'Fase 5: Revestimentos Cerâmicos',
+          description: 'Chapisco, assentamento e rejuntamento de azulejos e pisos em banheiro, cozinha, área de serviço, sala e quartos',
+          startDate: '06/04/2026',
+          endDate: '21/04/2026',
+          budget: 4500.00,
+          spent: 0,
+          status: 'pendente',
+          progress: 0
+        },
+        {
+          obraId: obraRob.id,
+          phase: 'Fase 6: Portas e Pintura',
+          description: 'Instalação de portas e batentes, massa corrida em paredes e tetos, pintura fundo, 1ª e 2ª demão e acabamentos',
+          startDate: '22/04/2026',
+          endDate: '01/05/2026',
+          budget: 0,
+          spent: 0,
+          status: 'pendente',
+          progress: 0
+        },
+        {
+          obraId: obraRob.id,
+          phase: 'Fase 7: Finalização e Entrega',
+          description: 'Instalações elétricas finais e luminárias, limpeza técnica, vistoria pelo Eng. Civil Luan de Leon, ajustes finais e entrega com Termo de Recebimento',
+          startDate: '02/05/2026',
+          endDate: '05/05/2026',
+          budget: 2517.00,
+          spent: 0,
+          status: 'pendente',
+          progress: 0
+        }
+      ]
+    })
+
+    console.log('✅ Obra Roberto criada')
+
+    res.json({
+      success: true,
       message: 'Seed executado! Dados recriados.',
       users: ['luandeleon@estrutto.com.br (ENGINEER)', 'roberto@estrutto.com.br (CLIENT)', 'priscilla@estrutto.com.br (CLIENT)', 'marcelo@estrutto.com.br (CLIENT)'],
-      obra: obra.name
+      obras: [
+        { nome: obra.name, etapas: 6, totalObra: 'R$ 46.010,00', recebido: 'R$ 29.871,25', saldo: 'R$ 16.138,75' },
+        { nome: obraPri.name, etapas: 5, progresso: '32%' },
+        { nome: obraRob.name, etapas: 7, totalObra: 'R$ 29.467,00', recebido: 'R$ 8.950,00', saldo: 'R$ 20.517,00' }
+      ]
     })
   } catch (error) {
     console.error(error)
