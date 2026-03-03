@@ -518,8 +518,9 @@ io.on('connection', (socket) => {
 
 // ─── HEALTH CHECK ───
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
+    version: '469008d',
     timestamp: new Date().toISOString(),
     database: 'PostgreSQL via Prisma',
     storage: 'Cloudinary'
@@ -873,7 +874,7 @@ app.get('/api/run-seed', async (req, res) => {
     })
   } catch (error) {
     console.error(error)
-    res.status(500).json({ error: error.message })
+    res.status(500).json({ error: error.message, stack: error.stack?.split('\n').slice(0, 5) })
   }
 })
 
