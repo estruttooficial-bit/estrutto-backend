@@ -430,8 +430,15 @@ app.post('/api/mensagens', authMiddleware, async (req, res) => {
 // GET RDOs de uma obra
 app.get('/api/obras/:obraId/rdos', authMiddleware, async (req, res) => {
   try {
+    const obraId = parseInt(req.params.obraId)
+    const tipo = req.user.type
     const rdos = await prisma.rDO.findMany({
-      where: { obraId: parseInt(req.params.obraId) },
+      where: {
+        obraId,
+        ...(tipo === 'APOIO' && { userId: req.user.id }),
+        ...(tipo === 'CLIENT' && { user: { type: 'ENGINEER' } }),
+        // ENGINEER vê todos
+      },
       include: { user: { select: { id: true, name: true } } },
       orderBy: { date: 'desc' }
     })
