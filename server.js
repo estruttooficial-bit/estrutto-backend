@@ -9,6 +9,7 @@ const cloudinary = require('cloudinary').v2
 const { PrismaClient } = require('@prisma/client')
 const multer = require('multer')
 const streamifier = require('streamifier')
+const RDOAgent = require('./services/rdoAgent')
 
 // ─── INICIALIZAÇÃO ───
 const app = express()
@@ -449,10 +450,11 @@ app.get('/api/obras/:obraId/rdos', authMiddleware, async (req, res) => {
   }
 })
 
-// POST criar RDO
+// POST criar RDO (auto-processa com IA quando status = 'enviado')
 app.post('/api/rdos', authMiddleware, async (req, res) => {
   try {
     const { obraId, date, content, status } = req.body
+    const statusFinal = status || 'rascunho'
 
     const rdo = await prisma.rDO.create({
       data: {
@@ -460,16 +462,181 @@ app.post('/api/rdos', authMiddleware, async (req, res) => {
         date,
         content,
         userId: req.user.id,
-        status: status || 'rascunho'
+        status: statusFinal,
+        ...(statusFinal === 'enviado' && { statusAgente: 'PROCESSANDO' })
       },
-      include: { user: { select: { id: true, name: true } } }
+      include: {
+        user: { select: { id: true, name: true } },
+        obra: { select: { name: true } }
+      }
     })
-    
+
     io.emit('rdo:criada', rdo)
     res.status(201).json(rdo)
+
+    // Dispara processamento IA em background (não bloqueia a resposta)
+    if (statusFinal === 'enviado' && process.env.ANTHROPIC_API_KEY) {
+      processarRdoComIA(rdo.id, content, rdo.obra?.name).catch(err =>
+        console.error('Erro background IA RDO:', err)
+      )
+    }
   } catch (error) {
     console.error('Erro ao criar RDO:', error)
     res.status(500).json({ error: 'Erro ao criar RDO' })
+  }
+})
+
+// Função de processamento IA em background
+async function processarRdoComIA(rdoId, contentStr, obraName) {
+  try {
+    let rdoData
+    try { rdoData = JSON.parse(contentStr) } catch { rdoData = { atividades: contentStr } }
+
+    const nivel = RDOAgent.classificarNivel(rdoData)
+    const startTime = Date.now()
+
+    if (nivel === 2) {
+      // Tenta gerar perguntas
+      const resultado = await RDOAgent.gerarPerguntas(rdoData)
+      if (resultado.precisaPerguntas && resultado.perguntas?.length) {
+        const tokens = resultado._tokens || {}
+        await prisma.rDO.update({
+          where: { id: rdoId },
+          data: {
+            nivel,
+            statusAgente: 'AGUARDANDO_RESPOSTAS',
+            perguntas: resultado.perguntas,
+            tokensUsados: tokens,
+            custoProcessamento: RDOAgent.calcularCusto(tokens.input || 0, tokens.output || 0),
+          }
+        })
+        io.emit('rdo:aguardando_respostas', { rdoId, perguntas: resultado.perguntas })
+        return
+      }
+      // Se não precisou de perguntas, processa direto como Nível 1
+    }
+
+    let resultado
+    if (nivel === 3) {
+      resultado = await RDOAgent.processarNivel3(rdoData, obraName)
+    } else {
+      resultado = await RDOAgent.processarNivel1(rdoData, obraName)
+    }
+
+    const tokens = resultado._tokens || {}
+    const tempoProcessamento = (Date.now() - startTime) / 1000
+
+    await prisma.rDO.update({
+      where: { id: rdoId },
+      data: {
+        nivel,
+        statusAgente: 'PROCESSADO',
+        versaoInterna: resultado.versaoInterna,
+        versaoCliente: resultado.versaoCliente,
+        ...(resultado.relatorioTecnico && { relatorioTecnico: resultado.relatorioTecnico }),
+        tokensUsados: tokens,
+        custoProcessamento: RDOAgent.calcularCusto(tokens.input || 0, tokens.output || 0),
+        tempoProcessamento,
+        processadoEm: new Date(),
+      }
+    })
+
+    io.emit('rdo:processado', { rdoId, nivel })
+    console.log(`✅ RDO ${rdoId} processado pela IA (Nível ${nivel}, $${RDOAgent.calcularCusto(tokens.input || 0, tokens.output || 0).toFixed(4)})`)
+  } catch (err) {
+    console.error(`❌ Erro IA RDO ${rdoId}:`, err.message)
+    await prisma.rDO.update({
+      where: { id: rdoId },
+      data: { statusAgente: 'ERRO' }
+    }).catch(() => {})
+    io.emit('rdo:erro_ia', { rdoId })
+  }
+}
+
+// POST responder perguntas (Nível 2)
+app.post('/api/rdo/answer', authMiddleware, async (req, res) => {
+  try {
+    const { rdoId, respostas } = req.body
+    if (!rdoId || !respostas?.length) {
+      return res.status(400).json({ error: 'rdoId e respostas são obrigatórios' })
+    }
+
+    const rdo = await prisma.rDO.findUnique({
+      where: { id: parseInt(rdoId) },
+      include: { obra: { select: { name: true } } }
+    })
+
+    if (!rdo) return res.status(404).json({ error: 'RDO não encontrado' })
+    if (rdo.statusAgente !== 'AGUARDANDO_RESPOSTAS') {
+      return res.status(400).json({ error: 'RDO não está aguardando respostas' })
+    }
+
+    // Marca como processando e retorna imediatamente
+    await prisma.rDO.update({
+      where: { id: rdo.id },
+      data: { statusAgente: 'PROCESSANDO', respostas }
+    })
+
+    res.json({ ok: true, message: 'Respostas recebidas, processando...' })
+
+    // Processa em background
+    ;(async () => {
+      try {
+        let rdoData
+        try { rdoData = JSON.parse(rdo.content) } catch { rdoData = { atividades: rdo.content } }
+
+        const startTime = Date.now()
+        const resultado = await RDOAgent.processarComRespostas(rdoData, rdo.perguntas, respostas, rdo.obra?.name)
+        const tokens = resultado._tokens || {}
+
+        await prisma.rDO.update({
+          where: { id: rdo.id },
+          data: {
+            statusAgente: 'PROCESSADO',
+            versaoInterna: resultado.versaoInterna,
+            versaoCliente: resultado.versaoCliente,
+            tokensUsados: tokens,
+            custoProcessamento: (rdo.custoProcessamento || 0) + RDOAgent.calcularCusto(tokens.input || 0, tokens.output || 0),
+            tempoProcessamento: (Date.now() - startTime) / 1000,
+            processadoEm: new Date(),
+          }
+        })
+
+        io.emit('rdo:processado', { rdoId: rdo.id, nivel: rdo.nivel })
+      } catch (err) {
+        console.error(`❌ Erro IA resposta RDO ${rdo.id}:`, err.message)
+        await prisma.rDO.update({ where: { id: rdo.id }, data: { statusAgente: 'ERRO' } }).catch(() => {})
+        io.emit('rdo:erro_ia', { rdoId: rdo.id })
+      }
+    })()
+  } catch (error) {
+    console.error('Erro ao processar respostas:', error)
+    res.status(500).json({ error: 'Erro ao processar respostas' })
+  }
+})
+
+// GET status do processamento IA de um RDO
+app.get('/api/rdo/status/:id', authMiddleware, async (req, res) => {
+  try {
+    const rdo = await prisma.rDO.findUnique({
+      where: { id: parseInt(req.params.id) },
+      select: {
+        id: true,
+        statusAgente: true,
+        nivel: true,
+        perguntas: true,
+        versaoInterna: true,
+        versaoCliente: true,
+        relatorioTecnico: true,
+        custoProcessamento: true,
+        tokensUsados: true,
+        processadoEm: true,
+      }
+    })
+    if (!rdo) return res.status(404).json({ error: 'RDO não encontrado' })
+    res.json(rdo)
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao consultar status' })
   }
 })
 

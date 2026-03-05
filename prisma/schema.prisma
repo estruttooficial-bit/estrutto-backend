@@ -103,15 +103,27 @@ model Mensagem {
 model RDO {
   id           Int       @id @default(autoincrement())
   date         String    // Data do RDO (formato: DD/MM/YYYY)
-  content      String    // Conteúdo do relatório
+  content      String    // Conteúdo do relatório (JSON)
   status       String    @default("rascunho") // rascunho, enviado, aprovado
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  // Campos do Agente RDO (IA)
+  statusAgente       String?   // PROCESSANDO | PROCESSADO | AGUARDANDO_RESPOSTAS | ERRO
+  nivel              Int?      // Nível de processamento: 1, 2 ou 3
+  versaoInterna      Json?     // RDO Interno gerado pela IA
+  versaoCliente      Json?     // RDO Cliente gerado pela IA
+  relatorioTecnico   Json?     // Relatório técnico extra (Nível 3)
+  perguntas          Json?     // Perguntas para o apoio (Nível 2)
+  respostas          Json?     // Respostas do apoio (Nível 2)
+  custoProcessamento Float?    // Custo em USD da chamada à API
+  tokensUsados       Json?     // { input, output, total }
+  processadoEm       DateTime? // Quando o processamento foi concluído
+
   // Relacionamentos
   obraId       Int
   obra         Obra      @relation("ObraRDOs", fields: [obraId], references: [id], onDelete: Cascade)
-  
+
   userId       Int
   user         User      @relation("UsuarioRDOs", fields: [userId], references: [id], onDelete: Cascade)
 

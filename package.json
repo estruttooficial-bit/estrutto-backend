@@ -14,10 +14,16 @@
     "studio": "prisma studio",
     "db:reset": "prisma migrate reset"
   },
-  "keywords": ["construction", "obras", "engineering", "management"],
+  "keywords": [
+    "construction",
+    "obras",
+    "engineering",
+    "management"
+  ],
   "author": "Luan de Leon",
   "license": "ISC",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@prisma/client": "^5.9.1",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^1.41.0",
