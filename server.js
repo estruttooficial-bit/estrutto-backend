@@ -536,7 +536,6 @@ async function processarRdoComIA(rdoId, contentStr, obraName) {
         ...(resultado.relatorioTecnico && { relatorioTecnico: resultado.relatorioTecnico }),
         tokensUsados: tokens,
         custoProcessamento: RDOAgent.calcularCusto(tokens.input || 0, tokens.output || 0),
-        tempoProcessamento,
         processadoEm: new Date(),
       }
     })
@@ -597,7 +596,6 @@ app.post('/api/rdo/answer', authMiddleware, async (req, res) => {
             versaoCliente: resultado.versaoCliente,
             tokensUsados: tokens,
             custoProcessamento: (rdo.custoProcessamento || 0) + RDOAgent.calcularCusto(tokens.input || 0, tokens.output || 0),
-            tempoProcessamento: (Date.now() - startTime) / 1000,
             processadoEm: new Date(),
           }
         })
