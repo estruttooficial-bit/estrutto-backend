@@ -443,7 +443,12 @@ app.get('/api/obras/:obraId/rdos', authMiddleware, async (req, res) => {
       include: { user: { select: { id: true, name: true } } },
       orderBy: { date: 'desc' }
     })
-    res.json(rdos)
+    // CLIENT não recebe versão interna
+    if (tipo === 'CLIENT') {
+      res.json(rdos.map(r => ({ ...r, versaoInterna: undefined, relatorioTecnico: undefined })))
+    } else {
+      res.json(rdos)
+    }
   } catch (error) {
     console.error('Erro ao buscar RDOs:', error)
     res.status(500).json({ error: 'Erro ao buscar RDOs' })
