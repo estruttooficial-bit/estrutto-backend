@@ -638,6 +638,21 @@ app.get('/api/rdo/status/:id', authMiddleware, async (req, res) => {
   }
 })
 
+// DELETE apagar RDO (somente ENGINEER)
+app.delete('/api/rdos/:id', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.type !== 'ENGINEER') {
+      return res.status(403).json({ error: 'Apenas engenheiros podem apagar RDOs' })
+    }
+    await prisma.rDO.delete({ where: { id: parseInt(req.params.id) } })
+    io.emit('rdo:deletado', { id: parseInt(req.params.id) })
+    res.json({ message: 'RDO apagado' })
+  } catch (error) {
+    console.error('Erro ao apagar RDO:', error)
+    res.status(500).json({ error: 'Erro ao apagar RDO' })
+  }
+})
+
 // PUT atualizar RDO (enviar, aprovar, etc)
 app.put('/api/rdos/:id', authMiddleware, async (req, res) => {
   try {
