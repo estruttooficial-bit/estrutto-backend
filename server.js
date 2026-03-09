@@ -90,8 +90,8 @@ app.get('/api/obras', authMiddleware, async (req, res) => {
     
     if (user.type === 'ENGINEER') {
       whereClause = { userId: user.id }
-    } else if (user.type === 'APOIO') {
-      whereClause = {} // Apoio vê todas as obras
+    } else if (user.type === 'APOIO' || user.type === 'FUNCIONARIO') {
+      whereClause = {} // Apoio e Funcionário veem todas as obras
     } else {
       // Cliente vê obras onde o nome está em clientName
       whereClause = {
@@ -438,14 +438,14 @@ app.get('/api/obras/:obraId/rdos', authMiddleware, async (req, res) => {
       where: {
         obraId,
         ...(tipo === 'APOIO' && { userId: req.user.id }),
-        ...(tipo === 'CLIENT' && { user: { type: 'ENGINEER' } }),
+        ...((tipo === 'CLIENT' || tipo === 'FUNCIONARIO') && { user: { type: 'ENGINEER' } }),
         // ENGINEER vê todos
       },
       include: { user: { select: { id: true, name: true } } },
       orderBy: { date: 'desc' }
     })
-    // CLIENT não recebe versão interna
-    if (tipo === 'CLIENT') {
+    // CLIENT e FUNCIONARIO não recebem versão interna
+    if (tipo === 'CLIENT' || tipo === 'FUNCIONARIO') {
       res.json(rdos.map(r => ({ ...r, versaoInterna: undefined, relatorioTecnico: undefined })))
     } else {
       res.json(rdos)
