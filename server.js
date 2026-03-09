@@ -681,6 +681,65 @@ app.put('/api/rdos/:id', authMiddleware, async (req, res) => {
   }
 })
 
+// POST corrigir versão cliente do RDO via IA (somente ENGINEER)
+app.post('/api/rdo/:id/corrigir-cliente', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.type !== 'ENGINEER') {
+      return res.status(403).json({ error: 'Apenas engenheiros podem corrigir RDOs' })
+    }
+
+    const { instrucao } = req.body
+    if (!instrucao?.trim()) return res.status(400).json({ error: 'Instrução de correção obrigatória' })
+
+    const rdo = await prisma.rDO.findUnique({
+      where: { id: parseInt(req.params.id) },
+      include: { obra: { select: { name: true } } }
+    })
+    if (!rdo) return res.status(404).json({ error: 'RDO não encontrado' })
+    if (!rdo.versaoCliente) return res.status(400).json({ error: 'RDO ainda não possui versão cliente gerada' })
+
+    const { default: Anthropic } = await import('@anthropic-ai/sdk').catch(() => ({ default: require('@anthropic-ai/sdk') }))
+    const anthropic = new (require('@anthropic-ai/sdk'))({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+    const msg = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 3000,
+      system: `Você é o Agente RDO da Estrutto Engenharia Ltda. Aplique correções pontuais na versão cliente de um RDO conforme instruído pelo engenheiro. Retorne APENAS o JSON da versaoCliente corrigida, sem markdown externo.`,
+      messages: [{
+        role: 'user',
+        content: `Corrija a versão cliente deste RDO conforme a instrução abaixo.
+
+## INSTRUÇÃO DO ENGENHEIRO
+${instrucao}
+
+## VERSÃO CLIENTE ATUAL
+${JSON.stringify(rdo.versaoCliente, null, 2)}
+
+## DADOS ORIGINAIS DO RDO
+${rdo.content}
+
+Retorne apenas o JSON da versaoCliente corrigida, mantendo toda a estrutura e apenas aplicando a correção solicitada.`
+      }]
+    })
+
+    const texto = msg.content[0].text.replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim()
+    const versaoClienteCorrigida = JSON.parse(texto)
+
+    const rdoAtualizado = await prisma.rDO.update({
+      where: { id: rdo.id },
+      data: { versaoCliente: versaoClienteCorrigida },
+      include: { user: { select: { id: true, name: true } } }
+    })
+
+    io.emit('rdo:atualizada', rdoAtualizado)
+    console.log(`✅ RDO ${rdo.id} versão cliente corrigida pelo engenheiro`)
+    res.json(rdoAtualizado)
+  } catch (error) {
+    console.error('Erro ao corrigir RDO cliente:', error)
+    res.status(500).json({ error: 'Erro ao corrigir versão cliente' })
+  }
+})
+
 // ─── RELATÓRIO SEMANAL (IA) ───
 // POST /api/obras/:obraId/relatorio-semanal
 // Body: { semana: 'S8', dataInicio: '02/03/2026', dataFim: '07/03/2026' }  (datas opcionais)
