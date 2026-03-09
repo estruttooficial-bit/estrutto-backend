@@ -1,5 +1,8 @@
 node_modules
-# Keep environment variables out of version control
 .env
-
 /generated/prisma
+.claude/
+CLAUDE.md
+read_docx*.js
+read_docx*.ps1
+createUser.js
