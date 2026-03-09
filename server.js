@@ -10,6 +10,7 @@ const { PrismaClient } = require('@prisma/client')
 const multer = require('multer')
 const streamifier = require('streamifier')
 const RDOAgent = require('./services/rdoAgent')
+const WeeklyAgent = require('./services/weeklyAgent')
 
 // ─── INICIALIZAÇÃO ───
 const app = express()
@@ -677,6 +678,74 @@ app.put('/api/rdos/:id', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Erro ao atualizar RDO:', error)
     res.status(500).json({ error: 'Erro ao atualizar RDO' })
+  }
+})
+
+// ─── RELATÓRIO SEMANAL (IA) ───
+// POST /api/obras/:obraId/relatorio-semanal
+// Body: { semana: 'S8', dataInicio: '02/03/2026', dataFim: '07/03/2026' }  (datas opcionais)
+app.post('/api/obras/:obraId/relatorio-semanal', authMiddleware, async (req, res) => {
+  try {
+    if (req.user.type !== 'ENGINEER') {
+      return res.status(403).json({ error: 'Apenas engenheiros podem gerar relatórios semanais' })
+    }
+
+    const obraId = parseInt(req.params.obraId)
+    const { semana, dataInicio, dataFim } = req.body
+
+    const obra = await prisma.obra.findUnique({ where: { id: obraId } })
+    if (!obra) return res.status(404).json({ error: 'Obra não encontrada' })
+
+    // Busca RDOs da semana (filtra por data se fornecido, senão pega todos os enviados)
+    const rdos = await prisma.rDO.findMany({
+      where: {
+        obraId,
+        status: 'enviado',
+      },
+      include: { user: { select: { id: true, name: true } } },
+      orderBy: { date: 'asc' }
+    })
+
+    // Filtra por período se fornecido
+    let rdosFiltrados = rdos
+    if (dataInicio && dataFim) {
+      const parseDate = (str) => {
+        const [d, m, y] = str.split('/')
+        return new Date(y, m - 1, d)
+      }
+      const inicio = parseDate(dataInicio)
+      const fim = parseDate(dataFim)
+      rdosFiltrados = rdos.filter(r => {
+        const data = parseDate(r.date)
+        return data >= inicio && data <= fim
+      })
+    }
+
+    if (rdosFiltrados.length === 0) {
+      return res.status(400).json({ error: 'Nenhum RDO enviado encontrado para o período informado' })
+    }
+
+    const semanaLabel = semana || `S${new Date().toISOString().slice(0, 10)}`
+    const startTime = Date.now()
+    const resultado = await WeeklyAgent.gerarRelatorioSemanal(rdosFiltrados, obra.name, semanaLabel)
+    const tokens = resultado._tokens || {}
+    const custo = WeeklyAgent.calcularCusto(tokens.input || 0, tokens.output || 0)
+    const tempo = (Date.now() - startTime) / 1000
+
+    console.log(`✅ Relatório semanal ${semanaLabel} – ${obra.name} gerado ($${custo.toFixed(4)}, ${tempo.toFixed(1)}s)`)
+
+    res.json({
+      obraId,
+      obraName: obra.name,
+      semana: semanaLabel,
+      rdosIncluidos: rdosFiltrados.length,
+      custo,
+      ...resultado,
+      _tokens: undefined
+    })
+  } catch (error) {
+    console.error('Erro ao gerar relatório semanal:', error)
+    res.status(500).json({ error: error.message || 'Erro ao gerar relatório semanal' })
   }
 })
 
